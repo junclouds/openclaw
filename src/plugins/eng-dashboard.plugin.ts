@@ -211,8 +211,8 @@ async function listProjects(): Promise<ProjectSummary[]> {
       repoPath: "", // 可以从配置或 metadata 获取
       openTasks: issues.filter((i) => i.status === "open").length,
       inProgressTasks: issues.filter((i) => i.status === "in_progress").length,
-      doneTasks: issues.filter((i) => ["closed", "done"].includes(i.status)).length,
-      lastUpdatedAt: (sortedByDate[0]?.updated_at as string) || new Date().toISOString(),
+      doneTasks: issues.filter((i) => i.status && ["closed", "done"].includes(i.status)).length,
+      lastUpdatedAt: String(sortedByDate[0]?.updated_at || new Date().toISOString()),
       status: calculateProjectStatus(issues),
     };
   });
@@ -247,10 +247,10 @@ async function listTasks(params: {
       return true;
     })
     .map((issue) => ({
-      id: issue.id,
-      projectId: extractProjectFromId(issue.id),
+      id: issue.id || "",
+      projectId: extractProjectFromId(issue.id || ""),
       title: issue.title || "Untitled",
-      status: mapStatus(issue.status),
+      status: mapStatus(issue.status || ""),
       priority: issue.priority || 0,
       assignee: issue.assignee,
       tags: (issue.labels as string[]) || [],
@@ -303,7 +303,11 @@ async function nudgeTask(params: { taskId: string; action: string }): Promise<Ta
 
   // 3. 调用 Gas Town (创建 convoy 并 sling 给 worker)
   const rig = extractProjectFromId(issue.id);
-  let convoyId = issue.metadata?.gastown_convoy_id;
+  const metadata = issue.metadata;
+  let convoyId: string | undefined =
+    metadata && typeof metadata.gastown_convoy_id === "string"
+      ? metadata.gastown_convoy_id
+      : undefined;
 
   try {
     if (!convoyId) {
@@ -343,9 +347,10 @@ async function nudgeTask(params: { taskId: string; action: string }): Promise<Ta
   }
 
   // 4. 返回更新后的任务
+  const issueId = String(issue.id || "");
   return {
-    id: issue.id,
-    projectId: extractProjectFromId(issue.id),
+    id: issueId,
+    projectId: extractProjectFromId(issueId),
     title: issue.title || "Untitled",
     status: "in_progress",
     priority: issue.priority || 0,
@@ -353,9 +358,9 @@ async function nudgeTask(params: { taskId: string; action: string }): Promise<Ta
     tags: (issue.labels as string[]) || [],
     createdAt: issue.created_at || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    relatedConvoyId: convoyId || (issue.metadata?.gastown_convoy_id as string | undefined),
-    branch: issue.metadata?.git_branch as string | undefined,
-    lastSummary: issue.metadata?.summary as string | undefined,
+    relatedConvoyId: convoyId || undefined,
+    branch: undefined,
+    lastSummary: undefined,
   };
 }
 
@@ -408,7 +413,7 @@ async function getWorkerStatus(taskId: string): Promise<{
   }
 
   // 3. 映射到 worker 状态
-  const mappedStatus = mapToWorkerStatus(issue.status, convoyStatus);
+  const mappedStatus = mapToWorkerStatus(String(issue.status || ""), convoyStatus);
 
   return {
     taskId,
@@ -558,7 +563,7 @@ async function summarizeTask(taskId: string): Promise<TaskProgressSummary> {
 
   return {
     taskId,
-    status: mapStatus(issue.status),
+    status: mapStatus(String(issue.status || "")),
     progressSummary,
     risks: issue.status === "blocked" ? ["Task is currently blocked"] : undefined,
     nextSteps: issue.status === "open" ? ["Start working on this task"] : undefined,
