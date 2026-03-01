@@ -4,6 +4,7 @@ import { CANVAS_HOST_PATH } from "../canvas-host/a2ui.js";
 import { type CanvasHostHandler, createCanvasHostHandler } from "../canvas-host/server.js";
 import type { CliDeps } from "../cli/deps.js";
 import type { createSubsystemLogger } from "../logging/subsystem.js";
+import { registerEngDashboardPlugin } from "../plugins/eng-dashboard.plugin.js";
 import type { PluginRegistry } from "../plugins/registry.js";
 import type { RuntimeEnv } from "../runtime.js";
 import type { AuthRateLimiter } from "./auth-rate-limit.js";
@@ -110,6 +111,9 @@ export async function createGatewayRuntimeState(params: {
     port: params.port,
     logHooks: params.logHooks,
   });
+
+  // Register eng-dashboard plugin routes
+  registerEngDashboardPlugin(params.pluginRegistry);
 
   const handlePluginRequest = createGatewayPluginRequestHandler({
     registry: params.pluginRegistry,
