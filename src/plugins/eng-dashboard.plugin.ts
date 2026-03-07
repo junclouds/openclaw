@@ -10,10 +10,11 @@ import type { PluginRegistry } from "./registry.js";
 
 const execAsync = promisify(exec);
 
-// Beads 数据库目录配置 (Gas Town rigs)
+// Beads 数据库目录配置 (Gas Town workspace .beads directories)
 const BEADS_DIRS = [
-  "/Users/lijun/work_github/gt-workspace/data_analysis_tool",
-  "/Users/lijun/work_github/gt-workspace/letterflow",
+  "/Users/lijun/work_github/gt-workspace/.beads",
+  "/Users/lijun/work_github/gt-workspace/data_analysis_tool/.beads",
+  "/Users/lijun/work_github/gt-workspace/letterflow/.beads",
 ];
 
 // 数据模型类型定义
@@ -561,14 +562,24 @@ async function summarizeTask(taskId: string): Promise<TaskProgressSummary> {
   // 后续可以调用 Claude API 生成更详细的摘要
   const progressSummary = `Task "${String(issue.title || "Untitled")}" is currently ${String(issue.status || "unknown")}. ${issue.notes ? `Notes: ${String(issue.notes).substring(0, 100)}...` : ""}`;
 
+  // 计算进度百分比 (基于状态映射)
+  const statusToProgress: Record<string, number> = {
+    open: 0,
+    ready: 10,
+    in_progress: 30,
+    waiting_review: 70,
+    done: 100,
+    blocked: 0,
+  };
+  const progressPercent = statusToProgress[String(issue.status)] ?? 0;
+
   return {
     taskId,
-    status: mapStatus(String(issue.status || "")),
-    progressSummary,
-    risks: issue.status === "blocked" ? ["Task is currently blocked"] : undefined,
-    nextSteps: issue.status === "open" ? ["Start working on this task"] : undefined,
-    relatedCommits: issue.metadata?.related_commits as string[] | undefined,
-    relatedPRs: issue.metadata?.related_prs as string[] | undefined,
+    progressPercent,
+    risks: issue.status === "blocked" ? ["Task is currently blocked"] : [],
+    nextActions: issue.status === "open" ? ["Start working on this task"] : [],
+    branch: issue.metadata?.branch as string | undefined,
+    lastSummary: progressSummary,
   };
 }
 
